@@ -2,14 +2,14 @@ import tkinter as tk
 from tkinter import Canvas
 
 CELL = 40
-GRID = 15
-W = H = GRID * CELL
+# GRID = 15
+# W = H = GRID * CELL
 
 class Board:
-    def __init__(self, root):
-        self.canvas = tk.Canvas(root, width=W, height=H, bg="#1a1a1a")
-        self.canvas.pack()
+    def __init__(self, canvas):
+        self.canvas = canvas
         self.draw_board()
+
 
     def draw_cell(self, column, row , color, outline="#222"):
         x0, y0 = column * CELL, row * CELL
@@ -17,7 +17,7 @@ class Board:
         self.canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline=outline)
 
     def game_blocks(self):
-        # Block around the game
+            # Block around the game
         for row in range(0, 6):
             for column in range(6, 9):
                 self.draw_cell(column, row, 'white')
