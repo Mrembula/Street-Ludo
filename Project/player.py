@@ -4,7 +4,7 @@ from typing import List, Tuple, Optional
 from PIL import Image, ImageTk
 
 class Player:
-    def __init__(self, canvas: tk.Canvas, name, color="red", token_image_path=None, radius=10):
+    def __init__(self, canvas: tk.Canvas, name, color="red", radius=10, num_players=0):
         self.canvas = canvas
         self.name = name
         self.color = color
@@ -12,10 +12,8 @@ class Player:
         self.token_image = None
         self.token_id = None
         self.label_id = None
-        # optional image token
-        if token_image_path:
-            img = Image.open(token_image_path).resize((radius * 2, radius * 2), Image.Resampling.LANCZOS)
-            self.token_image = ImageTk.PhotoImage(img)
+        self.all_player = {}
+        self.total_slots = num_players
 
         # board-related
         self.square_centers: Optional[List[Tuple[int, int]]] = None
@@ -24,26 +22,41 @@ class Player:
     def attach_board(self, centers: List[Tuple[int, int]]):
         self.square_centers = centers
 
-    def _compute_offset(self, slot: int, total_slots: int) -> Tuple[int, int]:
-        if total_slots <= 1:
-            return (0, 0)
+    # Positioning players as the start
+    def _compute_offset(self, slot):# -> Tuple[int, int]:
+        oy1 = 93
+        oy2 = 297
         spacing = self.radius * 2 + 4
-        start = - (spacing * (total_slots - 1)) / 2
-        ox = int(start + slot * spacing)
-        return (ox, 0)
+        start = (spacing * 3) / 2
+        ox = int(start + slot * spacing) + 70
+        if self.color == "red":
+            return (ox + 15, oy1) # 190
+        elif self.color == "green":
+            return (ox + 190, oy1) # 340
+        elif self.color == "blue":
+            return (ox + 165, oy2) # 364
+        elif self.color == "yellow":
+            return (ox - 60, oy2)
+        else:
+            return (0, 0)
 
-    def place_on_square(self, index, slot=0, total_slots=1):
-        if self.square_centers is None:
-            raise RuntimeError("Board centers not attached. Call attach_board(...) first.")
-        if not (0 <= index < len(self.square_centers)):
-            raise IndexError("Square index out of range.")
-        self.current_index = index
-        print("Check for positioning: ", self.square_centers[index],self._compute_offset(slot, total_slots) )
-        cx, cy = self.square_centers[index]
-        ox, oy = self._compute_offset(slot, total_slots)
-        self.create_token_at(cx + ox, cy + oy)
+    def place_on_square(self, index, slot=0, color=None):
+        cell = 20;
+        for i in range(1, 5):
+            if self.square_centers is None:
+                raise RuntimeError("Board centers not attached. Call attach_board(...) first.")
+            if not (0 <= index < len(self.square_centers)):
+                raise IndexError("Square index out of range.")
+            self.current_index = index
+            cx, cy = self.square_centers[index]
+            ox, oy = self._compute_offset(slot)
+            x = (cx + (cell * i)) + (ox + (cell * i)) if i <= 2 else (cx + (cell * i - cell) + ox)
+            y = (cy + i) + (oy + i) if i <= 2 else (cy + i) + (oy + (cell * i - cell))
+            if i == 4: x += 18; y -= 20
+            self.token_id = self.canvas.create_oval(x - self.radius, y - self.radius, x + self.radius, y + self.radius, fill=self.color, outline="black", width=3)
+            self.all_player[f"{color}-{i}"] = [x , y]
 
-    def move_steps(self, steps: int, board_size: int, slot: int = 0, total_slots: int = 1, wrap: bool = True):
+    def move_steps(self, steps, board_size: int, slot=0, total_slots=1, wrap=True):
         if self.current_index is None:
             self.current_index = 0
         new_index = self.current_index + steps
@@ -51,12 +64,13 @@ class Player:
             new_index %= board_size
         else:
             new_index = min(new_index, board_size - 1)
-        self.place_on_square(new_index, slot=slot, total_slots=total_slots)
+        self.place_on_square(new_index, slot=slot)
         return new_index
 
-    def create_token_at(self, x: int, y: int):
+    def create_token_at(self, x, y):
         if self.token_id:
             coords = self.canvas.coords(self.token_id)
+            print("coords: ", coords)
             if coords:
                 if len(coords) == 2:
                     self.canvas.coords(self.token_id, x, y)
@@ -66,15 +80,12 @@ class Player:
                 self.canvas.delete(self.token_id)
                 self.token_id = None
         if self.label_id:
+            print(2)
             self.canvas.coords(self.label_id, x, y + self.radius + 8)
 
         if not self.token_id:
-            self.token_id = self.canvas.create_oval(x - self.radius, y - self.radius, x + self.radius, y + self.radius, fill=self.color, outline="")
-
-            # if self.token_image:
-            #    self.token_id = self.canvas.create_image(x, y, image=self.token_image, anchor="center")
-            #else:
-            # self.label_id = self.canvas.create_text(x, y + self.radius + 8, text=self.name[0].upper(), fill="white", font=("TkDefaultFont", 8))
+            print(3)
+            self.token_id = self.canvas.create_oval(x - self.radius, y - self.radius, x + self.radius, y + self.radius, fill=self.color, outline="black", width=3)
 
     def leave_board(self):
         if self.token_id:
@@ -103,4 +114,12 @@ class Player:
             p.place_on_square(start_index, slot=i, total_slots=num)
             players.append(p)
         return players
+        
+        
+    
+        #if self.token_image:
+        #   self.token_id = self.canvas.create_image(x, y, image=self.token_image, anchor="center")
+        #else:
+        #   self.label_id = self.canvas.create_text(x, y + self.radius + 8, text=self.name[0].upper(), fill="white", font=("TkDefaultFont", 8))
+
 '''

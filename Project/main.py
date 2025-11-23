@@ -47,13 +47,13 @@ def main():
     left, top = 20, 60
     square_centers = make_square_centers(columns, rows, left, top, cell_w, cell_h)
 
-    colors = ['red', 'blue', 'green', 'yellow']
+    colors = ['red', 'green', 'blue', 'yellow']
     players = []
     for i in range(num_players):
-        name = f"Player-{i + 1}"
-        create_player = Player(canvas, name, colors[i % len(colors)])
+        name = f"Player-{i}"
+        create_player = Player(canvas, name, colors[i % len(colors)], 10, num_players)
         create_player.attach_board(square_centers)
-        create_player.place_on_square(0, slot=i, total_slots=num_players)
+        create_player.place_on_square(0, slot=i, color=colors[i])
         players.append(create_player)
     root.mainloop()
 
