@@ -1,125 +1,189 @@
 import tkinter as tk
-from tkinter import simpledialog
-from typing import List, Tuple, Optional
-from PIL import Image, ImageTk
+
+# from Project.game import start_blocks
+from Project.path_data import center
+
+CELL = 40
+GRID = 15
+W = H = GRID * CELL
+
+def index_to_coord(index, cols=GRID, cell_size=CELL):
+    row = index // cols
+    col = index % cols
+    x = col * cell_size + cell_size // 2
+    y = row * cell_size + cell_size // 2
+    return x, y
 
 class Player:
-    def __init__(self, canvas: tk.Canvas, name, color="red", radius=10, num_players=0):
+    def __init__(self, canvas: tk.Canvas, name, color="red", radius=10, num_players=0, centers=None):
         self.canvas = canvas
         self.name = name
-        self.color = color
+        self.colors = color
         self.radius = radius
-        self.token_image = None
         self.token_id = None
-        self.label_id = None
-        self.all_player = {}
-        self.total_slots = num_players
-
-        # board-related
-        self.square_centers: Optional[List[Tuple[int, int]]] = None
-        self.current_index: Optional[int] = None
-
-    def attach_board(self, centers: List[Tuple[int, int]]):
+        self.label_id = 1
+        self.tokens = {}
+        self.current_index = []
         self.square_centers = centers
+        self.home_paths = {}
+        self.total_slots = num_players
+        self.active_player_index = 0
 
-    # Positioning players as the start
-    def _compute_offset(self, slot):# -> Tuple[int, int]:
-        oy1 = 93
-        oy2 = 297
-        spacing = self.radius * 2 + 4
-        start = (spacing * 3) / 2
-        ox = int(start + slot * spacing) + 70
-        if self.color == "red":
-            return (ox + 15, oy1) # 190
-        elif self.color == "green":
-            return (ox + 190, oy1) # 340
-        elif self.color == "blue":
-            return (ox + 165, oy2) # 364
-        elif self.color == "yellow":
-            return (ox - 60, oy2)
+        self.recent_player = [None, None]
+        # board-related
+        self.token_indices = {f"{color}-{i + 1}": 0 for color in ['red', 'green', 'blue', 'yellow'] for i in range(4)}  # self.color returns single color
+        self.start_blocks = {"red": (-121.0, 85.0), "green": (159.0, -115.0), "yellow": (79.0, 365.0),"blue": (359.0, 165.0)}
+        self.start_indices = {color: self.nearest_index(row, col) for color, (row, col) in self.start_blocks.items()}
+
+
+    def nearest_index(self, target_x, target_y):
+        return min(range(len(self.square_centers)),
+                   key=lambda i: (self.square_centers[i][0] - target_x) ** 2 + (self.square_centers[i][1] - target_y) ** 2)
+
+
+    def place_home_tokens(self, home_center):
+        cx, cy = home_center[self.colors]
+        offsets = [(0, 0), (40, 2), (0, 41), (38, 42)]
+        for i, (ox, oy) in enumerate(offsets, start=1):
+            x = cx + ox
+            y = cy + oy
+            token_id = self.canvas.create_oval(x - self.radius, y - self.radius, x + self.radius, y + self.radius,
+                                    fill=self.colors, outline="black", width=3)
+            self.tokens[f"{self.colors}-{i}"] = token_id
+            self.home_paths[f"{self.colors}-{i}"] = (cx, cy) # Save this to check player in the home path
+
+    
+    def enter_path(self, token_name, start_index):
+        token_id = self.tokens[token_name]
+        player_color, active_player = token_name.split('-')
+        self.label_id = active_player
+        start_box = self.start_blocks[player_color]
+        x, y = start_box
+        print(self.nearest_index(x, y))
+        self.canvas.move(token_id, start_box[0], start_box[1])
+        print(f"{token_name} entered path at index {start_index}")
+
+
+    def show_active_player(self, change):
+        color, active_player = self.recent_player
+        print("WTF no 2: ", active_player, self.recent_player)
+        token_id = self.tokens[active_player]
+        if change == 0:
+            self.canvas.itemconfig(token_id, fill="gold", outline="gold", width=3)
         else:
-            return (0, 0)
+            self.canvas.itemconfig(token_id, fill=f"{color}", outline="gold", width=3)
 
-    def place_on_square(self, index, slot=0, color=None):
-        cell = 20;
-        for i in range(1, 5):
-            if self.square_centers is None:
-                raise RuntimeError("Board centers not attached. Call attach_board(...) first.")
-            if not (0 <= index < len(self.square_centers)):
-                raise IndexError("Square index out of range.")
-            self.current_index = index
-            cx, cy = self.square_centers[index]
-            ox, oy = self._compute_offset(slot)
-            x = (cx + (cell * i)) + (ox + (cell * i)) if i <= 2 else (cx + (cell * i - cell) + ox)
-            y = (cy + i) + (oy + i) if i <= 2 else (cy + i) + (oy + (cell * i - cell))
-            if i == 4: x += 18; y -= 20
-            self.token_id = self.canvas.create_oval(x - self.radius, y - self.radius, x + self.radius, y + self.radius, fill=self.color, outline="black", width=3)
-            self.all_player[f"{color}-{i}"] = [x , y]
+    
+    def switch_token(self):
+        # Rotate to next player
+        color, active_player = self.recent_player
+        self.show_active_player(0) # Return player back to color
+        print("WTF: ", int(self.label_id) + 1)
+        self.active_token_index = (int(self.label_id) + 1) % len(self.tokens)
+        print("Check: ", self.active_token_index)
+        self.label_id = active_player
+        self.recent_player = [color, f"{color}-{self.active_token_index}"]
+        print(f"Switched to {self.recent_player} player")
+        self.show_active_player(1)
 
-    def move_steps(self, steps, board_size: int, slot=0, total_slots=1, wrap=True):
-        if self.current_index is None:
-            self.current_index = 0
-        new_index = self.current_index + steps
-        if wrap:
-            new_index %= board_size
-        else:
-            new_index = min(new_index, board_size - 1)
-        self.place_on_square(new_index, slot=slot)
-        return new_index
 
-    def create_token_at(self, x, y):
-        if self.token_id:
-            coords = self.canvas.coords(self.token_id)
-            print("coords: ", coords)
-            if coords:
-                if len(coords) == 2:
-                    self.canvas.coords(self.token_id, x, y)
-                else:
-                    self.canvas.coords(self.token_id, x - self.radius, y - self.radius, x + self.radius, y + self.radius)
+    def move_steps(self, token_name, steps, wrap=False, delay=500):
+        if token_name not in self.tokens:
+            raise ValueError(f"No token named {token_name} found for {self.colors}")
+        token_id = self.tokens[token_name]
+        current_index = self.token_indices.get(token_name)
+
+        def step_animation(step_count, current_index):
+            new_index = current_index + 1
+            if wrap:
+                new_index %= len(self.square_centers)
             else:
-                self.canvas.delete(self.token_id)
-                self.token_id = None
-        if self.label_id:
-            print(2)
-            self.canvas.coords(self.label_id, x, y + self.radius + 8)
+                new_index = min(new_index, len(self.square_centers) - 1)
 
-        if not self.token_id:
-            print(3)
-            self.token_id = self.canvas.create_oval(x - self.radius, y - self.radius, x + self.radius, y + self.radius, fill=self.color, outline="black", width=3)
+            start = self.home_paths[token_name]
+            x1, y1, x2, y2 = self.canvas.coords(token_id)
+            if (x2 - self.radius) == start[0] and (y2 - self.radius) == start[1]:
+                # print("current index: ", self.square_centers[current_index], self.tokens)
+                print("Player can't move at home. We need a six")
+                return
+
+            cx, cy = self.square_centers[new_index]
+            cx_old = (x1 + x2) / 2
+            cy_old = (y1 + y2) / 2
+            dx = cx - cx_old
+            dy = cy - cy_old
+
+            self.canvas.move(token_id, dx, dy)
+            self.token_indices[token_name] = new_index
+
+            if step_count < steps[0]:
+                self.canvas.after(delay, step_animation, step_count + 1, new_index)
+            else:
+                print(f"{token_name} finished moving to index {new_index}")
+
+        # Start animation
+        step_animation(1, current_index)
 
     def leave_board(self):
-        if self.token_id:
-            self.canvas.delete(self.token_id)
-            self.token_id = None
-        if self.label_id:
-            self.canvas.delete(self.label_id)
-            self.label_id = None
-        self.current_index = None
+        for token_id in self.tokens.values():
+            self.canvas.delete(token_id)
+        self.tokens.clear()
+        self.token_indices.clear()
+
 
 '''
-    @classmethod
-    def create_players_from_dialog(cls, canvas: tk.Canvas, board_centers: List[Tuple[int, int]], default_colors: Optional[List[str]] = None, radius: int = 12, start_index: int = 0) -> List["Player"]:
-        """Show popup to ask number of players, create and place them on the board."""
-        parent = canvas.winfo_toplevel()
-        num = simpledialog.askinteger("Players", "Enter number of players (1-8):", parent=parent, minvalue=1, maxvalue=8, initialvalue=4)
-        if not num:
-            return []
+    def move_steps(self, token_name, steps, wrap=False, delay=500):
 
-        palette = default_colors or ["red", "blue", "green", "yellow", "orange", "purple", "cyan", "magenta"]
-        players: List[Player] = []
-        for i in range(num):
-            color = palette[i % len(palette)]
-            p = cls(canvas, name=f"P{i+1}", color=color, radius=radius)
-            p.attach_board(board_centers)
-            p.place_on_square(start_index, slot=i, total_slots=num)
-            players.append(p)
-        return players
-        
-        
-    
-        #if self.token_image:
-        #   self.token_id = self.canvas.create_image(x, y, image=self.token_image, anchor="center")
-        #else:
-        #   self.label_id = self.canvas.create_text(x, y + self.radius + 8, text=self.name[0].upper(), fill="white", font=("TkDefaultFont", 8))
+        if token_name not in self.tokens:
+            raise ValueError(f"No token named {token_name} found for {self.colors}")
+        token_id = self.tokens[token_name]
+        current_index = self.token_indices.get(token_name)
+
+        def step_animation(step_count, current_index):
+            new_index = current_index + 1
+            if wrap:
+                new_index %= len(self.square_centers)
+            else:
+                new_index = min(new_index, len(self.square_centers) - 1)
+
+            start = self.home_paths[token_name]
+            x1, y1, x2, y2 = self.canvas.coords(token_id)
+            if (x2 - self.radius) == start[0] and  (y2 - self.radius) == start[1]:
+                # print("current index: ", self.square_centers[current_index], self.tokens)
+                print("Player can't move at home. We need a six")
+                return
+
+            cx, cy = self.square_centers[new_index]
+            cx_old = (x1 + x2) / 2
+            cy_old = (y1 + y2) / 2
+            dx = cx - cx_old
+            dy = cy - cy_old
+
+            self.canvas.move(token_id, dx, dy)
+            self.token_indices[token_name] = new_index
+
+            if step_count < steps[0]:
+                self.canvas.after(delay, step_animation, step_count + 1, new_index)
+            else:
+                print(f"{token_name} finished moving to index {new_index}")
+        step_animation(1, current_index)
 
 '''
+
+'''
+
+     def handle_roll(self, player_color, dice_value):
+         if dice_value == 6:
+             token_name = f"{player_color}-1"
+             if self.token_indices.get(token_name) is None:
+                 self.enter_path(token_name)
+                 return
+
+         for token_name in self.tokens:
+             if token_name.startswith(player_color) and self.token_indices.get(token_name):
+                 self.move_steps(token_name, dice_value)
+                 break
+
+         self.next_path()
+     '''
+

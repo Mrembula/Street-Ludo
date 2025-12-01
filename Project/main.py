@@ -1,61 +1,59 @@
 import tkinter as tk
 from board import Board
 from dice import Dice
-import math
-from tkinter import Canvas, simpledialog
-from player import Player
+from game import Game
+from tkinter import simpledialog
+
 
 CELL = 40
 GRID = 15
-W = H = GRID * CELL
+# W = H = 640, 640
 
-def make_square_centers(columns, rows, left, top, cell_w, cell_h):
+# Create squares by converting coors to block numbers
+def create_square_centers(columns=15, rows=15, left=0, top=-40, cell_w=40, cell_h=40):
     centers = []
     for row in range(rows):
         for column in range(columns):
-            cx = left + column * cell_w // 2
-            cy = top + row * cell_h + cell_h // 2
+            cx = left + column * cell_w  + cell_w // 2
+            cy = top + row * cell_h + cell_h  + cell_h // 2
             centers.append((cx, cy))
     return centers
 
-
-def make_circle_centers(cx, cy, radius, count):
-    centers = []
-    for i in range(count):
-        angle = 2 * math .pi* i / count
-        x = cx + int(radius * math * math.cos(angle))
-        y = cy + int(radius * math * math.sin(angle))
-        centers.append((x, y))
-    return centers
-
-
 def main():
     root = tk.Tk()
+    root.title("Street Ludo")
+    canvas = tk.Canvas(root, width=600, height=600, bg="#1a1a1a", highlightthickness=0)
+    canvas.pack()
     root.withdraw()
-    num_players = simpledialog.askinteger( title="Number of players", prompt="Enter number of players (2-4):", minvalue=2, maxvalue=4, parent=root)
+    num_players = simpledialog.askinteger(title="Number of players", prompt="Enter number of players (2-4):", minvalue=2, maxvalue=4, parent=root)
     if not num_players:
         root.destroy()
         return
 
     root.deiconify()
-    canvas = tk.Canvas(root, width=W, height=H, bg="#1a1a1a", highlightthickness=0)
-    canvas.pack()
+    # Setup board + dice
     board = Board(canvas)
     dice = Dice(root, canvas, x=20, y=10)
+
+    # Build path
     columns, rows = 10, 10
     cell_w, cell_h = 60, 40
     left, top = 20, 60
-    square_centers = make_square_centers(columns, rows, left, top, cell_w, cell_h)
 
+    square_centers = create_square_centers(columns, rows, left, top, cell_w, cell_h)
+    # Create Game (rules + players)
     colors = ['red', 'green', 'blue', 'yellow']
-    players = []
-    for i in range(num_players):
-        name = f"Player-{i}"
-        create_player = Player(canvas, name, colors[i % len(colors)], 10, num_players)
-        create_player.attach_board(square_centers)
-        create_player.place_on_square(0, slot=i, color=colors[i])
-        players.append(create_player)
+    game = Game(root, canvas, board, dice, colors, square_centers, 'green', 'green-1')
+    game.highlight_active_players('green')
+
     root.mainloop()
 
 if __name__=="__main__":
     main()
+
+    '''
+    canvas.create_oval(600 // 2 - 5, 600 // 2 - 5, 600 // 2 + 5, 600 // 2 + 5, fill="yellow", outline="black", width=2)
+
+    for cx, cy in create_square_centers(15, 15, left=0, top=-40, cell_w=40, cell_h=40):
+        canvas.create_oval(cx - 5, cy - 5, cx + 5, cy + 5, fill="blue")
+    '''

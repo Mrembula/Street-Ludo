@@ -1,20 +1,20 @@
-import tkinter as tk
-from tkinter import Canvas
-
 CELL = 40
-# GRID = 15
-# W = H = GRID * CELL
 
 class Board:
     def __init__(self, canvas):
         self.canvas = canvas
+        self.square_centers = [] # Playable blocks
         self.draw_board()
-
 
     def draw_cell(self, column, row , color, outline="#222"):
         x0, y0 = column * CELL, row * CELL
         x1, y1 = x0 + CELL, y0 + CELL
         self.canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline=outline)
+
+        if color == 'white':
+            cx = (x0 + y1) / 2
+            cy = (y0 + y1) / 2
+            self.square_centers.append((cx, cy))
 
     def game_blocks(self):
             # Block around the game
@@ -29,7 +29,7 @@ class Board:
                 self.draw_cell(column, row, 'white')
         for column in range(9, 15):
             for row in range(6, 9):
-                self.draw_cell(column, row, 'white')
+               self.draw_cell(column, row, 'white')
 
     def start_block(self):
         # This is also considered stand by (No kicking zone)
@@ -73,4 +73,5 @@ class Board:
         row = 2.5 * CELL
         points = [cx, cy-row, cx+row, cy, cx, cy+row, cx-row, cy]
         self.canvas.create_polygon(points, fill="lightblue", outline="black")
+
 
