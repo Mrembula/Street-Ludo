@@ -44,7 +44,7 @@ def main():
     # Create Game (rules + players)
     colors = ['red', 'green', 'blue', 'yellow']
     game = Game(root, canvas, board, dice, colors, square_centers, 'green', 'green-1')
-    game.highlight_active_players('green')
+    # game.highlight_active_players('green')
 
     root.mainloop()
 

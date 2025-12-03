@@ -21,13 +21,14 @@ class Player:
         self.colors = color
         self.radius = radius
         self.token_id = None
-        self.label_id = 1
+        self.label_id = None
         self.tokens = {}
         self.current_index = []
         self.square_centers = centers
         self.home_paths = {}
         self.total_slots = num_players
-        self.active_player_index = 0
+        self.active_token_index = 0
+        self.player_no = 1
 
         self.recent_player = [None, None]
         # board-related
@@ -55,8 +56,7 @@ class Player:
     
     def enter_path(self, token_name, start_index):
         token_id = self.tokens[token_name]
-        player_color, active_player = token_name.split('-')
-        self.label_id = active_player
+        player_color, self.player_no = token_name.split('-')
         start_box = self.start_blocks[player_color]
         x, y = start_box
         print(self.nearest_index(x, y))
@@ -66,25 +66,24 @@ class Player:
 
     def show_active_player(self, change):
         color, active_player = self.recent_player
-        print("WTF no 2: ", active_player, self.recent_player)
         token_id = self.tokens[active_player]
-        if change == 0:
-            self.canvas.itemconfig(token_id, fill="gold", outline="gold", width=3)
+        if change == 1:
+            fill, outline = "gold", "gold"
+        elif change == 2:
+            fill, outline = color, "gold"
         else:
-            self.canvas.itemconfig(token_id, fill=f"{color}", outline="gold", width=3)
+            fill, outline = color, "black"
+        self.canvas.itemconfig(token_id, fill=fill, outline=outline, width=3)
 
-    
+
     def switch_token(self):
         # Rotate to next player
         color, active_player = self.recent_player
-        self.show_active_player(0) # Return player back to color
-        print("WTF: ", int(self.label_id) + 1)
-        self.active_token_index = (int(self.label_id) + 1) % len(self.tokens)
-        print("Check: ", self.active_token_index)
-        self.label_id = active_player
+        self.show_active_player(1) # Return player back to color
+        self.active_token_index = (self.player_no % len(self.tokens)) + 1
+        self.player_no = self.active_token_index
         self.recent_player = [color, f"{color}-{self.active_token_index}"]
-        print(f"Switched to {self.recent_player} player")
-        self.show_active_player(1)
+        self.show_active_player(2)
 
 
     def move_steps(self, token_name, steps, wrap=False, delay=500):
@@ -123,6 +122,7 @@ class Player:
 
         # Start animation
         step_animation(1, current_index)
+
 
     def leave_board(self):
         for token_id in self.tokens.values():
