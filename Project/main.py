@@ -7,7 +7,6 @@ from tkinter import simpledialog
 
 CELL = 40
 GRID = 15
-# W = H = 640, 640
 
 # Create squares by converting coors to block numbers
 def create_square_centers(columns=15, rows=15, left=0, top=-40, cell_w=40, cell_h=40):
@@ -50,10 +49,3 @@ def main():
 
 if __name__=="__main__":
     main()
-
-    '''
-    canvas.create_oval(600 // 2 - 5, 600 // 2 - 5, 600 // 2 + 5, 600 // 2 + 5, fill="yellow", outline="black", width=2)
-
-    for cx, cy in create_square_centers(15, 15, left=0, top=-40, cell_w=40, cell_h=40):
-        canvas.create_oval(cx - 5, cy - 5, cx + 5, cy + 5, fill="blue")
-    '''

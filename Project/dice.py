@@ -25,8 +25,6 @@ class Dice:
         self.dice1_id = self.canvas.create_image(self.x + 85, self.y - 6, image=self.dice1_images[0], anchor="nw")
         self.dice2_id = self.canvas.create_image(self.x + 110, self.y - 7, image=self.dice2_images[0], anchor="nw")
 
-        # self.button = tk.Button(self.root, text="Roll Dice", command=self.roll, bg="darkblue", fg="white")
-        # self.canvas.create_window(self.x, self.y - 10, window=self.button, anchor="nw")
 
     def roll(self):
         d1 = random.randint(1, 6)
