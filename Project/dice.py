@@ -31,4 +31,4 @@ class Dice:
         d2 = random.randint(1, 6)
         self.canvas.itemconfig(self.dice1_id, image=self.dice1_images[d1 - 1])
         self.canvas.itemconfig(self.dice2_id, image=self.dice2_images[d2 - 1])
-        return d1, d2
+        return [d1, d2]
