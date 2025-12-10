@@ -24,9 +24,8 @@ def main():
     canvas = tk.Canvas(root, width=600, height=600, bg="#1a1a1a", highlightthickness=0)
     canvas.pack()
     root.withdraw()
-
     num_players = simpledialog.askinteger(title="Number of players", prompt="Enter number of players (2-4):",
-                                          minvalue=2, maxvalue=4, parent=root)
+                                minvalue=2, maxvalue=4, parent=root)
     if not num_players:
         root.destroy()
         return
@@ -43,9 +42,9 @@ def main():
 
     all_colors = ['red', 'green', 'blue', 'yellow']
     active_colors = all_colors[:num_players]
-    game = Game(root, canvas, board, dice, active_colors, square_centers, active_colors[0], f'{active_colors[0]}-0')
-    root.mainloop()
 
+    game = Game(root, canvas, board, dice, active_colors, square_centers, active_colors[0], f'{active_colors[0]}-1')
+    root.mainloop()
 
 if __name__ == "__main__":
     main()

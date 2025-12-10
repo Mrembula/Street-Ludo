@@ -93,6 +93,7 @@ class Game:
         else:
             player.move_steps(token_name, dice, on_complete=self.move_finished(six_index))
             print(f"{token_name} moved {dice} steps.")
+
             move_successful = True
 
         if move_successful and current_state == "base":
@@ -100,6 +101,10 @@ class Game:
 
 
     def move_finished(self, index):
+        color, token_name = self.player_data
+        self.check_for_kick(color, token_name)
+        print("Move token checked: ", color, token_name)
+
         if self.dice_roll_number:
             self.dice_roll_number.pop(index)
 
@@ -130,22 +135,28 @@ class Game:
 
         if state != "main":
             return
-        safe_indices = [1, 14, 28, 42]
+        # Safe Zones: Start points for all players (1, 14, 28, 42)
+        # safe_indices = player.start_index_on_main.values()
+
+        # "red": 50, "green": 12, "blue": 25, "yellow": 38
+        safe_indices = player.home_entry_index.values()
 
         if index in safe_indices:
             print(f"Token {current_token_name} is on a safe spot. No kick possible {index}.")
             return
         for other_color, other_player in self.players.items():
             if other_color == current_color:
-                continue
-
+                continue # Don't kick yourself
             for token_name in other_player.tokens:
                 token_state, token_index = other_player.token_position[token_name]
 
                 if token_state == "main" and token_index == index:
-                    print(f"KICK! {current_token_name} kicked {token_name} back to base.")
-
-                    base_coords = other_color.home_paths[token_name]
-                    other_player.move_token_visual(token_name, base_coords)
+                    print(f"KICK! {token_name} kicked out {current_token_name} at index {index}.")
+                    print(other_player.home_paths)
+                    base_coords = other_player.home_paths.get(token_index)
+                    if base_coords:
+                        other_player.move_token_visual(token_name, base_coords)
+                    else:
+                        print(f"Error: No base coordinates found for {token_name}.")
                     other_player.token_position[token_name] = ("base", 0)
 
