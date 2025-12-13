@@ -9,7 +9,7 @@ W = H = GRID * CELL
 base_coords = {"red": [(4, 4), (5, 4), (4, 5), (5, 5)], "green": [(10, 4), (9, 4), (9, 5), (10, 5)],
              "blue": [(9, 9), (10, 9), (9, 10), (10, 10)], "yellow": [(4, 9), (5, 9), (4, 10), (5, 10)]}
 
-# Bit of glitch on the player movement. Counts twicce on some steps. Got worse without getting better
+# Bit of glitch on the player movement. Counts twice on some steps. Got worse without getting better
 def index_to_coord(index, cols=GRID, cell_size=CELL):
     row = index // cols
     col = index % cols
@@ -36,7 +36,6 @@ class Player:
         self.recent_player = [color, name]
         # board-related
         self.token_indices = {f"{color}-{i + 1}": 0 for color in ['red', 'green', 'blue', 'yellow'] for i in range(4)}
-        # self.start_index_on_main = {"red": 1, "green": 14, "blue": 28, "yellow": 42}
         self.start_index_on_main = {"red": 1, "green": 14, "blue": 28, "yellow": 42}
         self.home_entry_index = {"red": 50, "green": 12, "blue": 25, "yellow": 38}
         self.place_home_tokens()
@@ -79,24 +78,34 @@ class Player:
             fill, outline = color, "black"
         self.canvas.itemconfig(token_id, fill=fill, outline=outline, width=3)
 
-
     def switch_token(self):
-        # Rotate to next player
         color, active_player = self.recent_player
-        # self.show_active_player(1)  # Return player back to color
+
+        # Reset current visual highlight
         old_token_id = self.tokens[active_player]
         if old_token_id:
-            self.canvas.itemconfig(old_token_id, fill=color, outline="black", width=3)
+            self.canvas.itemconfig(old_token_id, fill=color, outline="black", width=2)
 
-        print("player no 1: ", self.player_no)
-        self.active_token_index = (int(self.player_no) + 1) % len(self.tokens)
-        self.player_no = self.active_token_index
-        print("player no 2: ", self.player_no)
+        # Extract current index (e.g., 'red-0' -> 0)
+        current_idx = int(active_player.split('-')[-1])
+        found_next = False
 
-        new_token_name = f"{color}-{self.active_token_index}"
-        self.recent_player = [color, new_token_name]
+        for _ in range(len(self.tokens)):
+            current_idx = (current_idx + 1) % len(self.tokens)
+            next_name = f"{color}-{current_idx}"
+            state, _ = self.token_position[next_name]
+
+            # Only switch to tokens that are actually out on the board
+            if state == "main":
+                self.player_no = current_idx
+                self.recent_player = [color, next_name]
+                found_next = True
+                break
+
+        if not found_next:
+            print("No other active tokens on the main path.")
+
         self.show_active_player(2)
-
 
 
     def move_token_visual(self, token_name, target_coord):
@@ -122,53 +131,37 @@ class Player:
         current_state, current_index = self.token_position[token_name]
         color = self.recent_player[0]
         path_length = len(self.board.main_path_coords)
-        home_entry_index = self.home_entry_index[color]
+        home_entry = self.home_entry_index[color]
 
         if current_state == "main":
-            next_index = (current_index + 1) % path_length
-
-            # if next_index == home_entry_index:
-            if current_index < home_entry_index <= current_index + remaining_steps:
-                # If moving past entry, calculate steps needed to reach the entry cell
-                steps_to_entry = home_entry_index - current_index
-                # Move to home entry cell
-                cx, cy = self.board.main_path_coords[home_entry_index]
-                self.move_token_visual(token_name, (cx, cy))
-                # Switch to "finish" state (index -1 indicates entry door)
-                new_remaining_steps = remaining_steps - steps_to_entry
+            # Check if this specific step enters the home streak
+            if current_index == home_entry:
                 self.token_position[token_name] = ("finish", -1)
-                self.canvas.after(delay, self.step_animation, token_name, new_remaining_steps, delay, on_complete)
+                # Continue animation in the 'finish' state immediately
+                self.step_animation(token_name, remaining_steps, delay, on_complete)
                 return
-            elif current_index >= home_entry_index and current_index + remaining_steps >= path_length + home_entry_index:
-                # Handle full wrap-around before home entry check
-                cx, cy = self.board.main_path_coords[next_index]
-                self.token_position[token_name] = ("main", next_index)
-                self.move_token_visual(token_name, (cx, cy))
-            else:
-                # Standard move on the main pat
-                cx, cy = self.board.main_path_coords[next_index]
-                self.token_position[token_name] = ("main", next_index)
-                self.move_token_visual(token_name, (cx, cy))
+
+            next_index = (current_index + 1) % path_length
+            target = self.board.main_path_coords[next_index]
+            self.token_position[token_name] = ("main", next_index)
+            self.move_token_visual(token_name, target)
 
         elif current_state == "finish":
             target_path = self.board.home_paths[color]
-            next_index_in_home = current_index + 1
-            if current_index == -1:
-                next_index_in_home = 0
+            next_idx_home = current_index + 1
 
-            if next_index_in_home == len(target_path):
-                # remaining_steps = 0
-                # self.token_position[token_name] = ("finish", len(target_path) - 1)
-                if on_complete:
-                    on_complete()
-                return
+            if next_idx_home < len(target_path):
+                target = target_path[next_idx_home]
+                self.token_position[token_name] = ("finish", next_idx_home)
+                self.move_token_visual(token_name, target)
 
-            if next_index_in_home == len(target_path) - 1 and remaining_steps > 1:
-                # print("Overshot home base. Must roll exact amount.")
-                remaining_steps = 1
+                # Check if this was the last possible cell (The Center)
+                if next_idx_home == len(target_path) - 1:
+                    self.token_position[token_name] = ("finished", 0)
+                    self.canvas.itemconfig(self.tokens[token_name], fill="gray")
+                    remaining_steps = 1  # Force stop after this step
+            else:
+                remaining_steps = 1  # Safety stop
 
-            cx, cy = target_path[next_index_in_home]
-            self.move_token_visual(token_name, (cx, cy))
-            self.token_position[token_name] = ("finish", next_index_in_home)
-        # print("Moving in home path")
+        # Schedule next step
         self.canvas.after(delay, self.step_animation, token_name, remaining_steps - 1, delay, on_complete)

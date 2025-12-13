@@ -16,6 +16,7 @@ class Game:
         self.turn_order = list(colors)
         self.current_turn = 0
         self.next_turn = 0
+        self.doubles_rolled = 0
         self.dice_roll_number = [None, None]
         self.button = tk.Button(self.root, text="Roll Dice", command=self.roll, bg="darkblue", fg="white")
         self.canvas.create_window(20, 2, window=self.button, anchor="nw")
@@ -24,24 +25,37 @@ class Game:
         self.move_button = tk.Button(self.root, text=f"move {self.player_data[1]}", command=self.handle_roll,
                                      bg=f"{self.active_color}", fg="white")
         self.canvas.create_window(20, 35, window=self.move_button, anchor="nw")
+        self.enter_button = tk.Button(self.root, text="Enter player", command=self.handle_entry,
+                                              bg=f"{self.active_color}",state="disabled",  fg="white", anchor="nw")
+        self.canvas.create_window(125, 35, window=self.enter_button, anchor="nw")
         self.highlight_active_players()
 
 
     def roll(self):
         self.button.config(state="disabled", bg="gray")
         self.dice_roll_number = self.dice.roll()
+
+        if self.dice_roll_number == [6, 6]:
+            self.doubles_rolled += 1
+            # print(f"Doubles 6 rolled! ({self.dice_roll_number[0]}) Extra turn granted.")
+        else:
+            self.doubles_rolled = 0
+
         color, token_name = self.player_data
         self.players[color].recent_player = [color, token_name]
         self.player_data = [color, token_name]
         self.check_token_at_base()
+        if 6 in self.dice_roll_number:
+            self.enter_button.config(state="normal", bg=self.active_color)
 
 
     def switch_player(self):
         player_color = self.player_data[0]
         self.players[player_color].switch_token()
-        change_no = self.players[player_color].player_no
-        self.move_button.config(text=f"move player-{change_no + 1}")
-        self.player_data[1] = f"{player_color}-{change_no}"
+
+        new_token_name = self.players[player_color].recent_player[1]
+        self.move_button.config(text=f"move {new_token_name}")
+        self.player_data[1] = new_token_name
 
 
     def highlight_active_players(self):
@@ -60,7 +74,7 @@ class Game:
         if 6 in self.dice_roll_number:
             six_index = self.dice_roll_number.index(6)
         else:
-            six_index = 0
+            six_index = -1
         dice = self.dice_roll_number[six_index]
 
         for token in player.tokens:
@@ -72,6 +86,35 @@ class Game:
             return
         return six_index
 
+    def handle_entry(self):
+        color, token_name = self.player_data
+        player = self.players[color]
+        six_index = self.check_token_at_base()
+
+        token_to_enter = None
+        for token_name in player.tokens:
+            token_state, _ = player.token_position[token_name]
+            if token_state == "base":
+                token_to_enter = token_name
+
+        if not token_to_enter:
+            # print("No tokens in base to enter.")
+            return
+
+        if token_to_enter != token_name:
+            # print(f"Switching to {token_to_enter} for entry")
+            player.show_active_player(3)
+            player.recent_player = [color, token_to_enter]
+            self.player_data = [color, token_to_enter]
+            token_name = token_to_enter
+            player.show_active_player(2)
+
+        start_index = player.start_index_on_main[color]
+        self.player_data = [color, token_name]
+        player.enter_path(token_name, start_index)
+        # print(f"{token_name} entered the path from base.")
+        self.move_finished(six_index)
+
 
     def handle_roll(self):
         if not self.dice_roll_number:
@@ -79,40 +122,83 @@ class Game:
 
         color, token_name = self.player_data
         player = self.players[color]
-        current_state, current_index = player.token_position[token_name]
-        move_successful = False
         six_index = self.check_token_at_base()
         dice = self.dice_roll_number[six_index]
-        if current_state == "base":
+        current_state, current_index = player.token_position[token_name]
+        print(current_state, current_index)
+        can_move_active =  current_state != "finished" or current_state == "main"
+
+        if not can_move_active:
+            movable_token = None
+            '''
             if dice == 6:
-                start_index = player.start_index_on_main[color]
-                player.enter_path(token_name, start_index)
-                move_successful = True
+                for t_name in player.tokens:
+                    if player.token_position[t_name][0] == "base":
+                        movable_token = t_name
+                        break
+            '''
+
+            if not movable_token:
+                for t_name in player.tokens:
+                    state, _ = player.token_position[t_name]
+                    if state in ["main", "finish"]:
+                        movable_token = t_name
+                        break
+
+            if movable_token:
+                # print(f"Auto-switching active token to {movable_token}...")
+                player.show_active_player(3)
+                self.player_data = [color, movable_token]
+                player.recent_player = self.player_data
+                player.show_active_player(2)
+                token_name = movable_token
+                current_state, current_index = player.token_position[token_name]
+
             else:
-                print(f"{token_name} cannot move out of base without rolling a 6.")
-        else:
-            player.move_steps(token_name, dice, on_complete=self.move_finished(six_index))
-            print(f"{token_name} moved {dice} steps.")
+                # print(f"No movable tokens for dice {dice}. Consuming roll.")
+                self.dice_roll_number.pop(six_index)
+                self.move_button.config(state="normal")
+                self.highlight_active_players()
+                return
 
-            move_successful = True
-
-        if move_successful and current_state == "base":
-            self.move_finished(six_index)
+        if current_state in ["main", "finish"]:
+            # Normal move with animation (uses callback)
+            player.move_steps(token_name, dice, on_complete=lambda: self.move_finished(six_index))
+            # print(f"{token_name} moved {dice} steps.")
+        # self.move_button.config(state="disabled")
 
 
     def move_finished(self, index):
+        # count_token = 0
+        # total_dice_sum = 0
+        player = self.players[self.player_data[0]]
         color, token_name = self.player_data
-        self.check_for_kick(color, token_name)
-        print("Move token checked: ", color, token_name)
+        kick_occurred = self.check_for_kick(color, token_name)
+        # print("Move token checked: ", color, token_name)
+        # for token_name in player.tokens:
+        #     if player.token_position[token_name][0] == "main":
+        #        count_token += 1
+
+        # if count_token == 1:
+        #     total_dice_sum = sum(self.dice_roll_number)
 
         if self.dice_roll_number:
             self.dice_roll_number.pop(index)
 
+        if kick_occurred or self.doubles_rolled > 0:
+            # print("Play again due to kick or doubles.")
+
+            if not self.dice_roll_number:
+                self.button.config(state="normal", bg="darkblue")
+                return
+
         if not self.dice_roll_number:
             self.switch_next_color()
         else:
-            print(f"One move done. Next die: {self.dice_roll_number[0]}")
+            # print(f"One move done. Next die: {self.dice_roll_number[0]}")
             self.highlight_active_players()
+        if self.dice_roll_number and self.dice_roll_number[0] != 6:
+            self.enter_button.config(state="disabled", bg="gray")
 
 
     def switch_next_color(self):
@@ -128,6 +214,11 @@ class Game:
         self.move_button.config(bg=self.active_color, text=f"move {self.active_color}-1")
         self.button.config(state="normal", bg="darkblue")
 
+    '''
+    Also wanted to add a merge player function but found it time consuming and complex
+    moving and kick both players tokens to the same position and handling their states.
+    So for now, just implementing kick functionality.
+    '''
 
     def check_for_kick(self, current_color, current_token_name):
         player = self.players[current_color]
@@ -136,14 +227,13 @@ class Game:
         if state != "main":
             return
         # Safe Zones: Start points for all players (1, 14, 28, 42)
-        # safe_indices = player.start_index_on_main.values()
-
-        # "red": 50, "green": 12, "blue": 25, "yellow": 38
-        safe_indices = player.home_entry_index.values()
+        safe_indices = player.start_index_on_main.values()
 
         if index in safe_indices:
             print(f"Token {current_token_name} is on a safe spot. No kick possible {index}.")
             return
+
+        kick_occurred = False
         for other_color, other_player in self.players.items():
             if other_color == current_color:
                 continue # Don't kick yourself
@@ -152,11 +242,13 @@ class Game:
 
                 if token_state == "main" and token_index == index:
                     print(f"KICK! {token_name} kicked out {current_token_name} at index {index}.")
-                    print(other_player.home_paths)
-                    base_coords = other_player.home_paths.get(token_index)
+                    # print(other_player.home_paths)
+                    base_coords = other_player.home_paths.get(token_name)
                     if base_coords:
                         other_player.move_token_visual(token_name, base_coords)
                     else:
                         print(f"Error: No base coordinates found for {token_name}.")
                     other_player.token_position[token_name] = ("base", 0)
+                    kick_occurred = True
 
+        return kick_occurred
