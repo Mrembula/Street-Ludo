@@ -35,6 +35,7 @@ class Player:
         self.token_position = {}
         self.recent_player = [color, name]
         # board-related
+        self.stacks = {f"{color}-{i}": [] for i in range(4)}
         self.token_indices = {f"{color}-{i + 1}": 0 for color in ['red', 'green', 'blue', 'yellow'] for i in range(4)}
         self.start_index_on_main = {"red": 1, "green": 14, "blue": 28, "yellow": 42}
         self.home_entry_index = {"red": 50, "green": 12, "blue": 25, "yellow": 38}
@@ -112,6 +113,18 @@ class Player:
         token_id = self.tokens[token_name]
         cx, cy = target_coord
         self.canvas.coords(token_id, cx - self.radius, cy - self.radius, cx + self.radius, cy + self.radius)
+
+        for follower_name in self.stacks.get(token_name, []):
+            follower_id = self.tokens[follower_name]
+            self.canvas.coords(follower_id, cx - self.radius, cy - self.radius, cx + self.radius, cy + self.radius)
+
+        # self.update_stack_positions(token_name, new_state, new index)
+
+
+    def update_stack_positions(self, token_name, state, index):
+        self.token_position[token_name] = (state, index)
+        for follower in self.stacks.get(token_name, []):
+            self.token_position[follower] = (state, index)
 
 
     def move_steps(self, token_name, steps, on_complete=None):

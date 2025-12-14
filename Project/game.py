@@ -130,13 +130,6 @@ class Game:
 
         if not can_move_active:
             movable_token = None
-            '''
-            if dice == 6:
-                for t_name in player.tokens:
-                    if player.token_position[t_name][0] == "base":
-                        movable_token = t_name
-                        break
-            '''
 
             if not movable_token:
                 for t_name in player.tokens:
@@ -169,18 +162,9 @@ class Game:
 
 
     def move_finished(self, index):
-        # count_token = 0
-        # total_dice_sum = 0
-        player = self.players[self.player_data[0]]
+        # player = self.players[self.player_data[0]]
         color, token_name = self.player_data
         kick_occurred = self.check_for_kick(color, token_name)
-        # print("Move token checked: ", color, token_name)
-        # for token_name in player.tokens:
-        #     if player.token_position[token_name][0] == "main":
-        #        count_token += 1
-
-        # if count_token == 1:
-        #     total_dice_sum = sum(self.dice_roll_number)
 
         if self.dice_roll_number:
             self.dice_roll_number.pop(index)
@@ -199,6 +183,8 @@ class Game:
             self.highlight_active_players()
         if self.dice_roll_number and self.dice_roll_number[0] != 6:
             self.enter_button.config(state="disabled", bg="gray")
+        self.check_for_stacking(color, token_name)
+        kick_occurred = self.check_for_kick(color, token_name)
 
 
     def switch_next_color(self):
@@ -220,6 +206,34 @@ class Game:
     So for now, just implementing kick functionality.
     '''
 
+    def check_for_stacking(self, color, leader_name):
+        player = self.players[color]
+        state, index = player.token_position[leader_name]
+        if state != "main":
+            return
+
+        safe_indices = list(player.start_index_on_main.values())
+
+        if index in safe_indices:
+            if player.stacks[leader_name]:
+                print(f"Safe Zone! {leader_name} stacking is splitting")
+                for follower in player.stacks[leader_name]:
+                    player.token_position[follower] = ("main", index)
+                player.stacks[leader_name] = []
+            return
+
+        for other_token in player.tokens:
+            if other_token == leader_name:
+                continue
+            other_state, other_index = player.token_position[other_token]
+            is_already_follower = any(other_token in s for s in player.stacks.values())
+
+            if other_state == "main" and other_index == index and not is_already_follower:
+                print(f"STACKING! {other_token} is stacking with {leader_name} at index {index}.")
+                player.stacks[leader_name].append(other_token)
+                player.token_position[other_token] = ("stacked", index)
+
+
     def check_for_kick(self, current_color, current_token_name):
         player = self.players[current_color]
         state, index = player.token_position[current_token_name]
@@ -240,15 +254,25 @@ class Game:
             for token_name in other_player.tokens:
                 token_state, token_index = other_player.token_position[token_name]
 
-                if token_state == "main" and token_index == index:
-                    print(f"KICK! {token_name} kicked out {current_token_name} at index {index}.")
-                    # print(other_player.home_paths)
-                    base_coords = other_player.home_paths.get(token_name)
-                    if base_coords:
-                        other_player.move_token_visual(token_name, base_coords)
-                    else:
-                        print(f"Error: No base coordinates found for {token_name}.")
-                    other_player.token_position[token_name] = ("base", 0)
+                if token_state == "main" and  token_index == index: # Create button for player to split a entery box
+                    victim_name = token_name
+                    print(f"KICK! {current_token_name} kicked out {victim_name} at index {index}")
+                    leader_base_coords = other_player.home_paths.get(victim_name)
+
+                    if leader_base_coords:
+                        other_player.move_token_visual(victim_name, leader_base_coords)
+                        other_player.token_position[token_name] = ("base", 0)
+
+                    if victim_name in other_player.stacks:
+                        for follower_name in other_player.stacks[victim_name]:
+                            follower_base_coords = other_player.home_paths[follower_name]
+
+                            if follower_base_coords:
+                                print(f"Sending follower {follower_name} back to base.")
+                                other_player.move_token_visual(follower_name, follower_base_coords)
+                                other_player.token_position[follower_name] = ("base", 0)
+
+                        other_player.stacks[victim_name] = []
                     kick_occurred = True
 
         return kick_occurred
