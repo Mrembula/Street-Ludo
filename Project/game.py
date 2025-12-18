@@ -1,3 +1,4 @@
+# from PIL.ImageDraw2 import Font
 from player import Player
 import tkinter as tk
 
@@ -33,6 +34,7 @@ class Game:
 
     def roll(self):
         self.button.config(state="disabled", bg="gray")
+        # self.move_button.config(state="disabled")
         self.dice_roll_number = self.dice.roll()
 
         if self.dice_roll_number == [6, 6]:
@@ -166,6 +168,15 @@ class Game:
         color, token_name = self.player_data
         kick_occurred = self.check_for_kick(color, token_name)
 
+        if self.check_win():
+            center_x, center_y = 300, 300
+            self.canvas.create_text(center_x, center_y, text=f"{self.active_color.upper()} WINS!",
+                                    Font=("Arial", 24, "bold"), fill="black")
+
+            self.button.config(state="disabled")
+            self.move_button.config(state="disabled")
+            self.switch_button.config(state="disabled")
+
         if self.dice_roll_number:
             self.dice_roll_number.pop(index)
 
@@ -232,6 +243,19 @@ class Game:
                 print(f"STACKING! {other_token} is stacking with {leader_name} at index {index}.")
                 player.stacks[leader_name].append(other_token)
                 player.token_position[other_token] = ("stacked", index)
+
+
+    def check_win(self):
+        player = self.players[self.active_color]
+        finished_count = 0
+        for token_name in player.tokens:
+            state, _ = player.token_position[token_name]
+            if state == "finished":
+                finished_count += 1
+
+        if finished_count == 4:
+            return  True
+        return False
 
 
     def check_for_kick(self, current_color, current_token_name):

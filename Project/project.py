@@ -18,6 +18,22 @@ def create_square_centers(columns=15, rows=15, left=0, top=-40, cell_w=40, cell_
             centers.append((cx, cy))
     return centers
 
+# Bit of glitch on the player movement. Counts twice on some steps. Got worse without getting better
+def index_to_coord(index, cols=GRID, cell_size=CELL):
+    row = index // cols
+    col = index % cols
+    x = col * cell_size + cell_size // 2
+    y = row * cell_size + cell_size // 2
+    return x, y
+
+def get_base_coordinates(color):
+    coords = {
+        "red": [(4, 4), (5, 4), (4, 5), (5, 5)], "green": [(10, 4), (9, 4), (9, 5), (10, 5)],
+             "blue": [(9, 9), (10, 9), (9, 10), (10, 10)], "yellow": [(4, 9), (5, 9), (4, 10), (5, 10)]
+    }
+    return coords.get(color, [])
+
+
 def main():
     root = tk.Tk()
     root.title("Street Ludo")

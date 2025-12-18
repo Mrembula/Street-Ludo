@@ -1,21 +1,11 @@
 import tkinter as tk
-
+# from project import  get_base_coordinates
 # Remove: from board import Board
 
 CELL = 40
 GRID = 15
 W = H = GRID * CELL
 
-base_coords = {"red": [(4, 4), (5, 4), (4, 5), (5, 5)], "green": [(10, 4), (9, 4), (9, 5), (10, 5)],
-             "blue": [(9, 9), (10, 9), (9, 10), (10, 10)], "yellow": [(4, 9), (5, 9), (4, 10), (5, 10)]}
-
-# Bit of glitch on the player movement. Counts twice on some steps. Got worse without getting better
-def index_to_coord(index, cols=GRID, cell_size=CELL):
-    row = index // cols
-    col = index % cols
-    x = col * cell_size + cell_size // 2
-    y = row * cell_size + cell_size // 2
-    return x, y
 
 
 class Player:
@@ -43,8 +33,9 @@ class Player:
 
 
     def place_home_tokens(self):
+        from project import get_base_coordinates # Circular import error if place at the top
         color = self.recent_player[0]
-        coords = base_coords[color]
+        coords = get_base_coordinates(color)
 
         for i, (c, r) in enumerate(coords):
             cx, cy = self.board.get_coord(c, r)
