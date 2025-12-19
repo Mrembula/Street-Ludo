@@ -8,12 +8,13 @@ W = H = GRID * CELL
 
 
 
+
+# python
 class Player:
     def __init__(self, canvas: tk.Canvas, board, name, color="red", radius=10, num_players=0, centers=None):
         self.canvas = canvas
-        self.board = board  # 2. Store the passed board instance
+        self.board = board
         self.radius = radius
-        self.token_id = None
         self.all_player = {}
         self.tokens = {}
         self.current_index = []
@@ -25,35 +26,35 @@ class Player:
         self.token_position = {}
         self.recent_player = [color, name]
         # board-related
-        self.stacks = {f"{color}-{i}": [] for i in range(4)}
-        self.token_indices = {f"{color}-{i + 1}": 0 for color in ['red', 'green', 'blue', 'yellow'] for i in range(4)}
+        # Use 1..4 token names consistently
+        self.stacks = {f"{color}-{i+1}": [] for i in range(4)}
+        self.token_indices = {f"{c}-{i + 1}": 0 for c in ['red', 'green', 'blue', 'yellow'] for i in range(4)}
         self.start_index_on_main = {"red": 1, "green": 14, "blue": 28, "yellow": 42}
         self.home_entry_index = {"red": 50, "green": 12, "blue": 25, "yellow": 38}
         self.place_home_tokens()
 
-
     def place_home_tokens(self):
-        from project import get_base_coordinates # Circular import error if place at the top
+        from project import get_base_coordinates
         color = self.recent_player[0]
         coords = get_base_coordinates(color)
 
         for i, (c, r) in enumerate(coords):
             cx, cy = self.board.get_coord(c, r)
-            token_name = f"{color}-{i}"
-            # Draw token
-            self.draw_token(token_name, (cx, cy))
-            self.tokens[token_name] = self.token_id
+            token_name = f"{color}-{i+1}"
+            # Draw token and store id explicitly
+            tid = self.draw_token(token_name, (cx, cy))
+            self.tokens[token_name] = tid
             self.home_paths[token_name] = (cx, cy)
             self.token_position[token_name] = ("base", 0)
 
-
-    def draw_token(self, token_name, center_coords):
+    def draw_token(self, token, center_coords):
         cx, cy = center_coords
-        self.token_id = self.canvas.create_oval(cx - self.radius, cy - self.radius, cx + self.radius, cy + self.radius, fill=self.recent_player[0], outline="black", width=2)
-
+        tid = self.canvas.create_oval(cx - self.radius, cy - self.radius, cx + self.radius, cy + self.radius, fill=self.recent_player[0], outline="black", width=2)
+        return tid
 
     def enter_path(self, token_name, start_index):
-        player_color, self.player_no = self.recent_player[1].split('-')
+        # Use the stored player color; do not split token name incorrectly
+        # player_color = self.recent_player[0]
         target_position = self.board.main_path_coords[start_index]
         self.move_token_visual(token_name, target_position)
         self.token_position[token_name] = ("main", start_index)
@@ -74,20 +75,19 @@ class Player:
         color, active_player = self.recent_player
 
         # Reset current visual highlight
-        old_token_id = self.tokens[active_player]
+        old_token_id = self.tokens.get(active_player)
         if old_token_id:
             self.canvas.itemconfig(old_token_id, fill=color, outline="black", width=2)
 
-        # Extract current index (e.g., 'red-0' -> 0)
+        # Extract current numeric index (1..4)
         current_idx = int(active_player.split('-')[-1])
         found_next = False
 
         for _ in range(len(self.tokens)):
-            current_idx = (current_idx + 1) % len(self.tokens)
+            current_idx = (current_idx % len(self.tokens)) + 1
             next_name = f"{color}-{current_idx}"
-            state, _ = self.token_position[next_name]
+            state, _ = self.token_position.get(next_name, ("base", 0))
 
-            # Only switch to tokens that are actually out on the board
             if state == "main":
                 self.player_no = current_idx
                 self.recent_player = [color, next_name]
