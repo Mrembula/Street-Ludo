@@ -7,9 +7,6 @@ GRID = 15
 W = H = GRID * CELL
 
 
-
-
-# python
 class Player:
     def __init__(self, canvas: tk.Canvas, board, name, color="red", radius=10, num_players=0, centers=None):
         self.canvas = canvas
@@ -26,7 +23,6 @@ class Player:
         self.token_position = {}
         self.recent_player = [color, name]
         # board-related
-        # Use 1..4 token names consistently
         self.stacks = {f"{color}-{i+1}": [] for i in range(4)}
         self.token_indices = {f"{c}-{i + 1}": 0 for c in ['red', 'green', 'blue', 'yellow'] for i in range(4)}
         self.start_index_on_main = {"red": 1, "green": 14, "blue": 28, "yellow": 42}
@@ -41,7 +37,6 @@ class Player:
         for i, (c, r) in enumerate(coords):
             cx, cy = self.board.get_coord(c, r)
             token_name = f"{color}-{i+1}"
-            # Draw token and store id explicitly
             tid = self.draw_token(token_name, (cx, cy))
             self.tokens[token_name] = tid
             self.home_paths[token_name] = (cx, cy)

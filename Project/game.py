@@ -2,7 +2,6 @@
 from player import Player
 import tkinter as tk
 
-
 class Game:
     def __init__(self, root, canvas, board, dice, colors, square_centers, color, active_player):
         self.root = root
@@ -88,6 +87,7 @@ class Game:
             return
         return six_index
 
+
     def handle_entry(self):
         color, token_name = self.player_data
         player = self.players[color]
@@ -134,10 +134,10 @@ class Game:
             movable_token = None
 
             if not movable_token:
-                for t_name in player.tokens:
-                    state, _ = player.token_position[t_name]
+                for token_name in player.tokens:
+                    state, _ = player.token_position[token_name]
                     if state in ["main", "finish"]:
-                        movable_token = t_name
+                        movable_token = token_name
                         break
 
             if movable_token:
@@ -195,7 +195,7 @@ class Game:
         if self.dice_roll_number and self.dice_roll_number[0] != 6:
             self.enter_button.config(state="disabled", bg="gray")
         self.check_for_stacking(color, token_name)
-        kick_occurred = self.check_for_kick(color, token_name)
+        # kick_occurred = self.check_for_kick(color, token_name)
 
 
     def switch_next_color(self):
@@ -211,11 +211,6 @@ class Game:
         self.move_button.config(bg=self.active_color, text=f"move {self.active_color}-1")
         self.button.config(state="normal", bg="darkblue")
 
-    '''
-    Also wanted to add a merge player function but found it time consuming and complex
-    moving and kick both players tokens to the same position and handling their states.
-    So for now, just implementing kick functionality.
-    '''
 
     def check_for_stacking(self, color, leader_name):
         player = self.players[color]
@@ -227,7 +222,7 @@ class Game:
 
         if index in safe_indices:
             if player.stacks[leader_name]:
-                print(f"Safe Zone! {leader_name} stacking is splitting")
+                # print(f"Safe Zone! {leader_name} stacking is splitting")
                 for follower in player.stacks[leader_name]:
                     player.token_position[follower] = ("main", index)
                 player.stacks[leader_name] = []
@@ -240,7 +235,7 @@ class Game:
             is_already_follower = any(other_token in s for s in player.stacks.values())
 
             if other_state == "main" and other_index == index and not is_already_follower:
-                print(f"STACKING! {other_token} is stacking with {leader_name} at index {index}.")
+                # print(f"STACKING! {other_token} is stacking with {leader_name} at index {index}.")
                 player.stacks[leader_name].append(other_token)
                 player.token_position[other_token] = ("stacked", index)
 
@@ -268,7 +263,7 @@ class Game:
         safe_indices = player.start_index_on_main.values()
 
         if index in safe_indices:
-            print(f"Token {current_token_name} is on a safe spot. No kick possible {index}.")
+            # print(f"Token {current_token_name} is on a safe spot. No kick possible {index}.")
             return
 
         kick_occurred = False
@@ -280,7 +275,7 @@ class Game:
 
                 if token_state == "main" and  token_index == index: # Create button for player to split a entery box
                     victim_name = token_name
-                    print(f"KICK! {current_token_name} kicked out {victim_name} at index {index}")
+                    # print(f"KICK! {current_token_name} kicked out {victim_name} at index {index}")
                     leader_base_coords = other_player.home_paths.get(victim_name)
 
                     if leader_base_coords:
@@ -292,7 +287,7 @@ class Game:
                             follower_base_coords = other_player.home_paths[follower_name]
 
                             if follower_base_coords:
-                                print(f"Sending follower {follower_name} back to base.")
+                                # print(f"Sending follower {follower_name} back to base.")
                                 other_player.move_token_visual(follower_name, follower_base_coords)
                                 other_player.token_position[follower_name] = ("base", 0)
 
