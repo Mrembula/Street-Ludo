@@ -1,6 +1,6 @@
-# from PIL.ImageDraw2 import Font
-from player import Player
 import tkinter as tk
+from player import Player
+
 
 class Game:
     def __init__(self, root, canvas, board, dice, colors, square_centers, color, active_player):
@@ -11,61 +11,93 @@ class Game:
         self.active_color = color
         self.square_centers = square_centers
         self.player_data = [color, active_player]
-        self.players = {color: Player(canvas, board, f"{color}", color, 10, len(colors), square_centers) for color in colors}
+        self.players = {color: Player(canvas, board, f"{color}-1", color, 10, len(colors), square_centers) for color in colors}
         self.players[color].recent_player = self.player_data
         self.turn_order = list(colors)
         self.current_turn = 0
         self.next_turn = 0
         self.doubles_rolled = 0
-        self.dice_roll_number = [None, None]
+        self.extra_turn = False
+        self.dice_roll_number = []
+        # UI Buttons
         self.button = tk.Button(self.root, text="Roll Dice", command=self.roll, bg="darkblue", fg="white")
         self.canvas.create_window(20, 2, window=self.button, anchor="nw")
-        self.switch_button = tk.Button(self.root, text="Switch", command=self.switch_player, bg="darkred", fg="white")
+        self.switch_button = tk.Button(self.root, text="Switch", command=self.switch_player, bg="darkred",
+                                       fg="white")
         self.canvas.create_window(160, 2, window=self.switch_button, anchor="nw")
-        self.move_button = tk.Button(self.root, text=f"move {self.player_data[1]}", command=self.handle_roll,
-                                     bg=f"{self.active_color}", fg="white")
+        self.move_button = tk.Button(self.root, text=f"Move {self.player_data[1]}", command=self.handle_roll,
+                                     bg=f"{self.active_color}", fg="white", state="disabled")
         self.canvas.create_window(20, 35, window=self.move_button, anchor="nw")
-        self.enter_button = tk.Button(self.root, text="Enter player", command=self.handle_entry,
-                                              bg=f"{self.active_color}",state="disabled",  fg="white", anchor="nw")
+        self.enter_button = tk.Button(self.root, text="Enter Player", command=self.handle_entry,
+                                     bg=f"{self.active_color}", state="disabled", fg="white", anchor="nw")
         self.canvas.create_window(125, 35, window=self.enter_button, anchor="nw")
         self.highlight_active_players()
 
 
     def roll(self):
         self.button.config(state="disabled", bg="gray")
-        # self.move_button.config(state="disabled")
         self.dice_roll_number = self.dice.roll()
+        self.extra_turn = False
 
-        if self.dice_roll_number == [6, 6]:
-            self.doubles_rolled += 1
-            # print(f"Doubles 6 rolled! ({self.dice_roll_number[0]}) Extra turn granted.")
-        else:
-            self.doubles_rolled = 0
+        # Rule: Double 6 or Doubles grants an extra turn
+        if self.dice_roll_number[0] == self.dice_roll_number[1]:
+            self.extra_turn = True
+            if self.dice_roll_number == [6, 6]:
+                self.doubles_rolled += 1
 
-        color, token_name = self.player_data
-        self.players[color].recent_player = [color, token_name]
-        self.player_data = [color, token_name]
-        self.check_token_at_base()
+        self.move_button.config(state="normal")
         if 6 in self.dice_roll_number:
             self.enter_button.config(state="normal", bg=self.active_color)
 
+        # Check if the player is stuck (no 6 and everyone is base/finished)
+        if not self.has_movable_tokens():
+            # Wait a second so user sees the dice, then switch
+            self.root.after(1000, self.switch_next_color)
+
+
+    def has_movable_tokens(self):
+        player = self.players[self.active_color]
+        has_six = 6 in self.dice_roll_number
+
+        for token_name in player.tokens:
+            state, _ = player.token_position[token_name]
+            if state == "main" or state == "finish":
+                return True
+            if state == "base" and has_six:
+                return True
+        return False
+
 
     def switch_player(self):
-        player_color = self.player_data[0]
-        self.players[player_color].switch_token()
+        player = self.players[self.active_color]
 
-        new_token_name = self.players[player_color].recent_player[1]
-        self.move_button.config(text=f"move {new_token_name}")
+        # 1. Tell the player object to cycle to the next token index (0-3)
+        player.active_token_index = (player.active_token_index + 1) % 4
+        new_token_name = f"{self.active_color}-{player.active_token_index + 1}"
+
+        # 2. Update the Game's tracking data
         self.player_data[1] = new_token_name
+
+        # 3. Update the button text so the user knows who they are moving
+        self.move_button.config(text=f"Move {new_token_name}")
+
+        # 4. Visual feedback
+        self.highlight_active_players()
 
 
     def highlight_active_players(self):
-        for token_name, token_id in self.players[self.active_color].tokens.items():
-            if token_name.startswith(self.active_color) and self.next_turn == self.current_turn:
-                self.canvas.itemconfig(token_id, fill="gold", outline="gold", width=3)
-            else:
-                self.canvas.itemconfig(token_id, fill=f"{self.active_color}", outline="black", width=3)
-        self.players[self.active_color].show_active_player(3)
+        # 1. First, reset EVERY token for EVERY player to their base color
+        for p_color, p_obj in self.players.items():
+            for t_name, t_id in p_obj.tokens.items():
+                self.canvas.itemconfig(t_id, fill=p_color, outline="black", width=2)
+
+        # 2. Now, specifically highlight only the one active token in gold
+        active_color, active_token_name = self.player_data
+        active_player_obj = self.players[active_color]
+
+        active_token_id = active_player_obj.tokens.get(active_token_name)
+        if active_token_id:
+            self.canvas.itemconfig(active_token_id, fill="gold", outline="gold", width=4)
 
 
     def check_token_at_base(self):
@@ -89,33 +121,29 @@ class Game:
 
 
     def handle_entry(self):
-        color, token_name = self.player_data
-        player = self.players[color]
-        six_index = self.check_token_at_base()
+        player = self.players[self.active_color]
 
+        # Find the first token that is actually IN the base
         token_to_enter = None
-        for token_name in player.tokens:
-            token_state, _ = player.token_position[token_name]
-            if token_state == "base":
-                token_to_enter = token_name
+        for t_name in player.tokens:
+            if player.token_position[t_name][0] == "base":
+                token_to_enter = t_name
+                break
 
-        if not token_to_enter:
-            # print("No tokens in base to enter.")
-            return
+        if token_to_enter:
+            self.move_button.config(state="disabled")
+            self.enter_button.config(state="disabled")
 
-        if token_to_enter != token_name:
-            # print(f"Switching to {token_to_enter} for entry")
-            player.show_active_player(3)
-            player.recent_player = [color, token_to_enter]
-            self.player_data = [color, token_to_enter]
-            token_name = token_to_enter
-            player.show_active_player(2)
+            # Move it to the start
+            start_idx = player.start_index_on_main[self.active_color]
+            player.enter_path(token_to_enter, start_idx)
 
-        start_index = player.start_index_on_main[color]
-        self.player_data = [color, token_name]
-        player.enter_path(token_name, start_index)
-        # print(f"{token_name} entered the path from base.")
-        self.move_finished(six_index)
+            # Find where the '6' is in the dice list and pop it
+            if 6 in self.dice_roll_number:
+                six_index = self.dice_roll_number.index(6)
+                self.move_finished(six_index)
+        else:
+            print("All tokens are already out of base!")
 
 
     def handle_roll(self):
@@ -124,174 +152,133 @@ class Game:
 
         color, token_name = self.player_data
         player = self.players[color]
-        six_index = self.check_token_at_base()
-        dice = self.dice_roll_number[six_index]
-        current_state, current_index = player.token_position[token_name]
-        print(current_state, current_index)
-        can_move_active =  current_state != "finished" or current_state == "main"
+        state, index = player.token_position.get(token_name, ("base", 0))
 
-        if not can_move_active:
+        if state == "base":
+            # ...look for ANY token that is already on the 'main' track or 'finish' track
             movable_token = None
-
-            if not movable_token:
-                for token_name in player.tokens:
-                    state, _ = player.token_position[token_name]
-                    if state in ["main", "finish"]:
-                        movable_token = token_name
-                        break
+            for t_name in player.tokens:
+                t_state, _ = player.token_position[t_name]
+                if t_state in ["main", "finish"]:
+                    movable_token = t_name
+                    break
 
             if movable_token:
-                # print(f"Auto-switching active token to {movable_token}...")
-                player.show_active_player(3)
-                self.player_data = [color, movable_token]
-                player.recent_player = self.player_data
-                player.show_active_player(2)
+                # Automatically switch to the movable token so the click isn't wasted
+                self.player_data[1] = movable_token
                 token_name = movable_token
-                current_state, current_index = player.token_position[token_name]
-
+                # state, index = player.token_position[token_name]
+                # print(f"Auto-switched to {token_name} because it is on the board.")
             else:
-                # print(f"No movable tokens for dice {dice}. Consuming roll.")
-                self.dice_roll_number.pop(six_index)
-                self.move_button.config(state="normal")
-                self.highlight_active_players()
-                return
+                # No tokens are on the board!
+                # If they don't have a 6, they are stuck.
+                if 6 not in self.dice_roll_number:
+                    # print("No movable tokens. Switching turn.")
+                    self.switch_next_color()
+                    return
+                else:
+                    # print("You must press 'Enter Player' to move a token out of base.")
+                    return  # Don't pop the dice! Let them press Enter Player instead.
 
-        if current_state in ["main", "finish"]:
-            # Normal move with animation (uses callback)
-            player.move_steps(token_name, dice, on_complete=lambda: self.move_finished(six_index))
-            # print(f"{token_name} moved {dice} steps.")
-        # self.move_button.config(state="disabled")
+        # If we reached here, we have a valid token to move
+        self.move_button.config(state="disabled")
+        self.enter_button.config(state="disabled")
+
+        dice_val = self.dice_roll_number[0]
+        player.move_steps(token_name, dice_val, on_complete=lambda: self.move_finished(0))
 
 
-    def move_finished(self, index):
-        # player = self.players[self.player_data[0]]
-        color, token_name = self.player_data
-        kick_occurred = self.check_for_kick(color, token_name)
-
-        if self.check_win():
-            center_x, center_y = 300, 300
-            self.canvas.create_text(center_x, center_y, text=f"{self.active_color.upper()} WINS!",
-                                    Font=("Arial", 24, "bold"), fill="black")
-
-            self.button.config(state="disabled")
-            self.move_button.config(state="disabled")
-            self.switch_button.config(state="disabled")
-
+    def move_finished(self, dice_index):
         if self.dice_roll_number:
-            self.dice_roll_number.pop(index)
+            self.dice_roll_number.pop(dice_index)
 
-        if kick_occurred or self.doubles_rolled > 0:
-            # print("Play again due to kick or doubles.")
+        color, token_name = self.player_data
 
-            if not self.dice_roll_number:
-                self.button.config(state="normal", bg="darkblue")
-                return
+        # Check for kick
+        if self.check_for_kick(color, token_name):
+            self.extra_turn = True
 
-        if not self.dice_roll_number:
-            self.switch_next_color()
-        else:
-            # print(f"One move done. Next die: {self.dice_roll_number[0]}")
+        # Check for win
+        if self.check_win():
+            self.canvas.create_text(300, 300, text=f"{self.active_color.upper()} WINS!",
+                                    font=("Arial", 30, "bold"), fill="white")
+            return
+
+        # Handle remaining dice or turn end
+        if self.dice_roll_number:
+            self.move_button.config(state="normal")
+            if 6 in self.dice_roll_number:
+                self.enter_button.config(state="normal")
             self.highlight_active_players()
-        if self.dice_roll_number and self.dice_roll_number[0] != 6:
-            self.enter_button.config(state="disabled", bg="gray")
-        self.check_for_stacking(color, token_name)
-        # kick_occurred = self.check_for_kick(color, token_name)
-
+        else:
+            if self.extra_turn:
+                # Award extra roll
+                self.button.config(state="normal", bg="darkblue")
+                self.move_button.config(state="disabled")
+                self.enter_button.config(state="disabled")
+            else:
+                self.switch_next_color()
 
     def switch_next_color(self):
-        self.current_turn = self.turn_order.index(self.player_data[0])
-        self.next_turn = (self.current_turn + 1) % len(self.turn_order)
-        next_color = self.turn_order[self.next_turn]
-        self.highlight_active_players()
-        self.active_color = next_color
+        # Move to next index in turn order
+        current_idx = self.turn_order.index(self.active_color)
+        next_idx = (current_idx + 1) % len(self.turn_order)
+
+        self.active_color = self.turn_order[next_idx]
+        # Default to the first token of the new player
         self.player_data = [self.active_color, f"{self.active_color}-1"]
-        self.players[next_color].recent_player = self.player_data
-        self.next_turn = self.current_turn
-        self.highlight_active_players()
-        self.move_button.config(bg=self.active_color, text=f"move {self.active_color}-1")
+
+        # Update buttons and UI
+        self.move_button.config(bg=self.active_color, text=f"move {self.player_data[1]}")
+        self.enter_button.config(bg=self.active_color)
         self.button.config(state="normal", bg="darkblue")
 
-
-    def check_for_stacking(self, color, leader_name):
-        player = self.players[color]
-        state, index = player.token_position[leader_name]
-        if state != "main":
-            return
-
-        safe_indices = list(player.start_index_on_main.values())
-
-        if index in safe_indices:
-            if player.stacks[leader_name]:
-                # print(f"Safe Zone! {leader_name} stacking is splitting")
-                for follower in player.stacks[leader_name]:
-                    player.token_position[follower] = ("main", index)
-                player.stacks[leader_name] = []
-            return
-
-        for other_token in player.tokens:
-            if other_token == leader_name:
-                continue
-            other_state, other_index = player.token_position[other_token]
-            is_already_follower = any(other_token in s for s in player.stacks.values())
-
-            if other_state == "main" and other_index == index and not is_already_follower:
-                # print(f"STACKING! {other_token} is stacking with {leader_name} at index {index}.")
-                player.stacks[leader_name].append(other_token)
-                player.token_position[other_token] = ("stacked", index)
+        # Update highlights once at the end
+        self.highlight_active_players()
 
 
     def check_win(self):
         player = self.players[self.active_color]
-        finished_count = 0
-        for token_name in player.tokens:
-            state, _ = player.token_position[token_name]
-            if state == "finished":
-                finished_count += 1
-
-        if finished_count == 4:
-            return  True
-        return False
-
+        return all(player.token_position[t][0] == "finished" for t in player.tokens)
 
     def check_for_kick(self, current_color, current_token_name):
         player = self.players[current_color]
         state, index = player.token_position[current_token_name]
+        if state != "main": return False
 
-        if state != "main":
-            return
-        # Safe Zones: Start points for all players (1, 14, 28, 42)
-        safe_indices = player.start_index_on_main.values()
-
-        if index in safe_indices:
-            # print(f"Token {current_token_name} is on a safe spot. No kick possible {index}.")
-            return
+        # Safe Zones
+        if index in player.start_index_on_main.values(): return False
 
         kick_occurred = False
         for other_color, other_player in self.players.items():
-            if other_color == current_color:
-                continue # Don't kick yourself
-            for token_name in other_player.tokens:
-                token_state, token_index = other_player.token_position[token_name]
-
-                if token_state == "main" and  token_index == index: # Create button for player to split a entery box
-                    victim_name = token_name
-                    # print(f"KICK! {current_token_name} kicked out {victim_name} at index {index}")
-                    leader_base_coords = other_player.home_paths.get(victim_name)
-
-                    if leader_base_coords:
-                        other_player.move_token_visual(victim_name, leader_base_coords)
-                        other_player.token_position[token_name] = ("base", 0)
-
-                    if victim_name in other_player.stacks:
-                        for follower_name in other_player.stacks[victim_name]:
-                            follower_base_coords = other_player.home_paths[follower_name]
-
-                            if follower_base_coords:
-                                # print(f"Sending follower {follower_name} back to base.")
-                                other_player.move_token_visual(follower_name, follower_base_coords)
-                                other_player.token_position[follower_name] = ("base", 0)
-
-                        other_player.stacks[victim_name] = []
+            if other_color == current_color: continue
+            for t_name, (t_state, t_index) in other_player.token_position.items():
+                if t_state == "main" and t_index == index:
+                    # Kick it back to base
+                    other_player.token_position[t_name] = ("base", 0)
+                    base_coord = other_player.home_paths[t_name]
+                    other_player.move_token_visual(t_name, base_coord)
                     kick_occurred = True
-
         return kick_occurred
+
+
+
+    '''
+    def switch_player(self):
+        player = self.players[self.active_color]
+        player.switch_token()
+        self.player_data[1] = player.recent_player[1]
+        self.move_button.config(text=f"Move {self.player_data[1]}")
+
+    def highlight_active_players(self):
+        # Clear highlights for all
+        for p_color, p_obj in self.players.items():
+            for t_id in p_obj.tokens.values():
+                self.canvas.itemconfig(t_id, width=2, outline="black")
+
+        # Highlight current player's tokens
+        active_player = self.players[self.active_color]
+        active_token_name = self.player_data[1]
+        tid = active_player.tokens[active_token_name]
+        self.canvas.itemconfig(tid, width=4, outline="gold")
+    '''

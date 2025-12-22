@@ -1,6 +1,5 @@
 import tkinter as tk
 # from project import  get_base_coordinates
-# Remove: from board import Board
 
 CELL = 40
 GRID = 15
@@ -29,6 +28,7 @@ class Player:
         self.home_entry_index = {"red": 50, "green": 12, "blue": 25, "yellow": 38}
         self.place_home_tokens()
 
+
     def place_home_tokens(self):
         from project import get_base_coordinates
         color = self.recent_player[0]
@@ -42,10 +42,12 @@ class Player:
             self.home_paths[token_name] = (cx, cy)
             self.token_position[token_name] = ("base", 0)
 
+
     def draw_token(self, token, center_coords):
         cx, cy = center_coords
-        tid = self.canvas.create_oval(cx - self.radius, cy - self.radius, cx + self.radius, cy + self.radius, fill=self.recent_player[0], outline="black", width=2)
-        return tid
+        token_id = self.canvas.create_oval(cx - self.radius, cy - self.radius, cx + self.radius, cy + self.radius, fill=self.recent_player[0], outline="black", width=2)
+        return token_id
+
 
     def enter_path(self, token_name, start_index):
         # Use the stored player color; do not split token name incorrectly
@@ -57,14 +59,25 @@ class Player:
 
     def show_active_player(self, change):
         color, active_player = self.recent_player
-        token_id = self.tokens[active_player]
+
+        # Safety: If active_player is just 'green', try 'green-1'
+        if active_player not in self.tokens:
+            active_player = f"{color}-1"
+            self.recent_player[1] = active_player
+
+        token_id = self.tokens.get(active_player)
+        if not token_id:
+            return
+
+        # Visual logic for selected vs unselected
         if change == 1:
             fill, outline = "gold", "gold"
         elif change == 2:
             fill, outline = color, "gold"
-        else:
+        else:  
             fill, outline = color, "black"
         self.canvas.itemconfig(token_id, fill=fill, outline=outline, width=3)
+
 
     def switch_token(self):
         color, active_player = self.recent_player
@@ -74,7 +87,7 @@ class Player:
         if old_token_id:
             self.canvas.itemconfig(old_token_id, fill=color, outline="black", width=2)
 
-        # Extract current numeric index (1..4)
+        # Extract current index (1..4)
         current_idx = int(active_player.split('-')[-1])
         found_next = False
 
@@ -103,7 +116,6 @@ class Player:
         for follower_name in self.stacks.get(token_name, []):
             follower_id = self.tokens[follower_name]
             self.canvas.coords(follower_id, cx - self.radius, cy - self.radius, cx + self.radius, cy + self.radius)
-
         # self.update_stack_positions(token_name, new_state, new index)
 
 
@@ -116,10 +128,10 @@ class Player:
     def move_steps(self, token_name, steps, on_complete=None):
         current_state, _ = self.token_position[token_name]
         if current_state == "base":
-            if on_complete:
-                on_complete()
+            if on_complete: on_complete()
             return
         self.step_animation(token_name, steps, 600, on_complete)
+
 
     def step_animation(self, token_name, remaining_steps, delay, on_complete):
         if remaining_steps <= 0:
