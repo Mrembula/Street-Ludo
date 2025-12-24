@@ -1,7 +1,6 @@
 Street Ludo
 Video Demo: https://youtu.be/PypDqb7D_7Q
 
-
 Description:
 Street Ludo is a graphical, turn-based multiplayer board game built using Python and the Tkinter library.
 It brings the classic Ludo experience to the desktop with a custom "Street" aesthetic.
